@@ -1,19 +1,26 @@
+var mpd = require('./mpdd');
+
 var net = require('net');
 
 var status;
-var state = 'init';
+exports.state = 'init';
 var queuedCommand;
 var lastStatus;
 var statusRe = /state: (.+)/;
 var randomRe = /random: (.+)/;
 var songIdRe = /songid: (.+)/;
 var songRe = /song: (.+)/;
+var playlistIdRe = /playlist: (.+)/;
 var playlistinfoRe = /Time: (.+)[^]Artist: (.+)[^]Title: (.+)[^]Album: (.+)[^]Date:.*/;
 var lastState;
 var lastRandom;
 var lastSongId;
 var lastSong;
 var client;
+var playlistId;
+var commandBuffer;
+var rawCommandBuffer = "";
+var playlists = null;
 
 var currentTitle;
 var currentAlbum;
@@ -30,46 +37,76 @@ var conn = function() {
         console.log('connected');
         client.setEncoding('utf8');
         status = "Connected";
-        state = 'init';
+        exports.state = 'init';
         SS.publish.broadcast('state', status);
     });
 
-    client.setKeepAlive( enable = true, 10000);
+    client.setKeepAlive(enable = true, 10000);
 
     client.on('data', function(data) {
+        if(rawCommandBuffer.length > 0)
+        {
+            if(rawCommandBuffer.charAt(rawCommandBuffer.length-1) != '\n')
+            {
+                console.log("No newline");
+                rawCommandBuffer = rawCommandBuffer.concat(data);
+            }
+            else
+            {
+                console.log("Using straight away");
+                rawCommandBuffer = data;
+            }
+        }
+        else
+        {
+            rawCommandBuffer = data;
+        }
+        if(data.charAt(data.length-1) != "\n")
+        {
+            return;
+        }
+        
+        commandBuffer = rawCommandBuffer.split("\n");
+        
+        if(mpd.checkIfCmdEnd(commandBuffer) == 0){
+            //We need more data...
+            return;
+        }
+        
+        mpd.logcommands(commandBuffer);
+        
         status = "Data " + data;
         SS.publish.broadcast('state', status);
-        console.log('>' + data + '< State: ' + state);
         if(data.indexOf('OK MPD') == 0) {
             console.log('logged in');
             client.write('password "getoutlozer"\n');
         }
         if(data == 'OK\n') {
             console.log('just OK');
-            if(state == 'sentNoIdle') {
+            if(exports.state == 'sentNoIdle') {
                 console.log('high-level is ' + queuedCommand);
                 if(queuedCommand == 'play') {
-                    if(lastStatus != null) {
-                        var match = statusRe.exec(lastStatus);
-                        lastState = match[1];
+                    if(lastState != null) {
                         console.log('state is now ' + lastState);
                         if(lastState == 'stop') {
                             client.write('play\n');
                         } else {
                             client.write('pause\n');
                         }
-                        state = 'sentCustomCommand';
+                        exports.state = 'sentCustomCommand';
                         return;
                     } else {
                         client.write('status\n');
+                        exports.state = 'sentStatus';
+                        return;
                     }
                 } else if(queuedCommand == 'next') {
                     client.write('next\n');
-                    state = 'sentCustomCommand';
+                    exports.state = 'sentCustomCommand';
                     return;
                 } else if(queuedCommand == 'prev') {
                     client.write('previous\n');
-                    state = 'sentCustomCommand';
+                    exports.state = 'sentCustomCommand';
                     return;
                 } else if(queuedCommand == 'random') {
                     if(lastRandom != null) {
@@ -78,37 +115,48 @@ var conn = function() {
                         } else {
                             client.write('random 1\n');
                         }
-                        state = 'sentCustomCommand';
+                        exports.state = 'sentCustomCommand';
                     }
                     return;
                 }
-
-            } else if(state == 'init') {
-                console.log('sending STATUS');
-                client.write('status\n');
-                state = 'sentStatus';
+            } else if(exports.state == 'init') {
+                if(playlists == null) {
+                    console.log("Fetching playlists")
+                    client.write('listplaylists\n')
+                    exports.state = 'sentListplaylists'
+                } else {
+                    console.log('sending STATUS');
+                    client.write('status\n');
+                    exports.state = 'sentStatus';
+                }
                 return;
             }
-
+ 
             client.write('idle\n');
-            state = 'sentIdle';
-
-        } else if(state == 'sentIdle' && data.indexOf('changed:') == 0) {
+            exports.state = 'sentIdle';
+ 
+        } else if(exports.state == 'sentListplaylists') {
+            playlists = mpd.parseLists(commandBuffer);
+            client.write('idle\n');
+            exports.state = 'sentIdle';
+        } else if(exports.state == 'sentIdle' && data.indexOf('changed:') == 0) {
             console.log('got idle status ');
             if(data.indexOf('player') != -1 || data.indexOf('playlist') != -1 || data.indexOf('mixer') != -1 || data.indexOf('options')) {
                 client.write('status\n');
-                state = 'sentStatus';
+                exports.state = 'sentStatus';
             } else {
                 client.write('idle\n');
-                state = 'sentIdle';
+                exports.state = 'sentIdle';
             }
-        } else if(state == 'sentStatus' && data.indexOf('volume:') != -1) {
+        } else if(exports.state == 'sentStatus' && data.indexOf('volume:') != -1) {
             console.log('got status');
             lastStatus = data;
             var match = statusRe.exec(lastStatus);
             lastState = match[1];
             var match = randomRe.exec(lastStatus);
             lastRandom = match[1];
+            var match = playlistIdRe.exec(lastStatus);
+            playlistId = match[1];
             var match = songIdRe.exec(lastStatus);
             if(match != null)
             {
@@ -118,23 +166,23 @@ var conn = function() {
                         console.log('Songid changed');
                         lastSongId = newSongId;
                         client.write('playlistinfo "' + lastSongId + '"\n');
-                        state = 'sentPlaylistinfo';
+                        exports.state = 'sentPlaylistinfo';
                     }
                 } else {
                     lastSongId = newSongId;
                     client.write('playlistinfo "' + lastSongId + '"\n');
-                    state = 'sentPlaylistinfo';
+                    exports.state = 'sentPlaylistinfo';
                 }
             }
             var match = songRe.exec(lastStatus);
             if(match != null) {
                 var lastSong = match[1];
             }
-            if(state != 'sentPlaylistinfo'){
+            if(exports.state != 'sentPlaylistinfo'){
                 client.write('idle\n');
-                state = 'sentIdle';
+                exports.state = 'sentIdle';
             }
-        } else if(state == 'sentPlaylistinfo'){
+        } else if(exports.state == 'sentPlaylistinfo'){
             var match = playlistinfoRe.exec(data);
             if(match != null){
                 currentTime = match[1];
@@ -144,7 +192,7 @@ var conn = function() {
                 SS.publish.broadcast('newsong', [currentTime, currentArtist, currentTitle, currentAlbum]);
             }
             client.write('idle\n');
-            state = 'sentIdle';
+            exports.state = 'sentIdle';
         }
     });
     var onDiss = function() {
@@ -167,13 +215,14 @@ var conn = function() {
         onDiss();
     });
 };
+
 conn();
 
 var sendHighlevel = function(command) {
     if(client != null) {
-        if(state == 'sentIdle') {
+        if(exports.state == 'sentIdle') {
             client.write('noidle\n');
-            state = 'sentNoIdle';
+            exports.state = 'sentNoIdle';
             queuedCommand = command;
         }
     }
