@@ -11,13 +11,11 @@ exports.parseLists = (data) ->
   index = 0
   playlists = []
   while index < data.length
-    console.log data[index]
+    #console.log data[index]
     m = plRe.exec(data[index])
     if m != null
       playlists.push m[1]
     index+=2
-
-  console.log "Found " + playlists.length + " playlists"
 
   return playlists
   
@@ -35,4 +33,4 @@ exports.checkIfCmdEnd = (commandBuffer) ->
     return 0
     
 exports.logcommands = (commandBuffer )->
-  console.log commandBuffer[0..5]
+  console.log commandBuffer[0..35]

@@ -11,8 +11,12 @@ exports.init = ->
   SS.server.app.init (response) ->
     $('#message').text(response)
 
-  SS.server.apa.state (response) ->
-   $('#status').text(response)
+  SS.server.mpd.getPlaylists (playlists) ->
+    $('playlists').text('<ul>')
+    playlists.forEach (playlist) ->
+      $('#playlists').append("<li>#{playlist}</li>")
+    $('playlists').append('</ul>')
+
   
   # Start the Quick Chat Demo
   SS.client.demo.init()

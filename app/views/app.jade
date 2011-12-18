@@ -6,35 +6,32 @@ html(lang="en")
     title Welcome
   body
     #content
-      button#prev prev
-      button#play play/pause
-      button#next next
-      button#rand random
-      p#message Attempting to connect to the server over websockets or Socket.IO fallback transports...
-      p#status Current status
-      div#song
-          div#title title
-          div#artist artist
-          div#album album
-
-      // QUICK CHAT DEMO
-      form#demo(onsubmit='return false')
-        h3 Quick Chat Demo
-        h5 Open this page in multiple tabs or browsers and type a message below
-        #chatlog
-        input(id='myMessage', type='text', autocomplete='off')
+      div#controls
+        div#buttons
+          button#prev prev
+          button#play play/pause
+          button#next next
+          button#rand random
+        p#message Attempting to connect to the server over websockets or Socket.IO fallback transports...
+        p#status Current status
+        div#song
+            div#title title
+            div#artist artist
+            div#album album
+      div#playlists
+      div#playing
       script(type="text/javascript")
         $("#play").mousedown(function(e){
-          SS.server.apa.play(null);
+          SS.server.mpd.play(null);
         })
         $("#prev").mousedown(function(e){
-          SS.server.apa.prev();
+          SS.server.mpd.prev();
         })
         $("#next").mousedown(function(e){
-          SS.server.apa.next();
+          SS.server.mpd.next();
         })
         $("#rand").mousedown(function(e){
-          SS.server.apa.random();
+          SS.server.mpd.random();
         })
 
 

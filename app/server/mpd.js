@@ -3,7 +3,7 @@ var mpd = require('./mpdd');
 var net = require('net');
 
 var status;
-exports.state = 'init';
+var state = 'init';
 var queuedCommand;
 var lastStatus;
 var statusRe = /state: (.+)/;
@@ -21,6 +21,7 @@ var playlistId;
 var commandBuffer;
 var rawCommandBuffer = "";
 var playlists = null;
+var playing = null;
 
 var currentTitle;
 var currentAlbum;
@@ -37,7 +38,7 @@ var conn = function() {
         console.log('connected');
         client.setEncoding('utf8');
         status = "Connected";
-        exports.state = 'init';
+        state = 'init';
         SS.publish.broadcast('state', status);
     });
 
@@ -83,7 +84,7 @@ var conn = function() {
         }
         if(data == 'OK\n') {
             console.log('just OK');
-            if(exports.state == 'sentNoIdle') {
+            if(state == 'sentNoIdle') {
                 console.log('high-level is ' + queuedCommand);
                 if(queuedCommand == 'play') {
                     if(lastState != null) {
@@ -93,20 +94,20 @@ var conn = function() {
                         } else {
                             client.write('pause\n');
                         }
-                        exports.state = 'sentCustomCommand';
+                        state = 'sentCustomCommand';
                         return;
                     } else {
                         client.write('status\n');
-                        exports.state = 'sentStatus';
+                        state = 'sentStatus';
                         return;
                     }
                 } else if(queuedCommand == 'next') {
                     client.write('next\n');
-                    exports.state = 'sentCustomCommand';
+                    state = 'sentCustomCommand';
                     return;
                 } else if(queuedCommand == 'prev') {
                     client.write('previous\n');
-                    exports.state = 'sentCustomCommand';
+                    state = 'sentCustomCommand';
                     return;
                 } else if(queuedCommand == 'random') {
                     if(lastRandom != null) {
@@ -115,40 +116,56 @@ var conn = function() {
                         } else {
                             client.write('random 1\n');
                         }
-                        exports.state = 'sentCustomCommand';
+                        state = 'sentCustomCommand';
                     }
                     return;
                 }
-            } else if(exports.state == 'init') {
+            } else if(state == 'init') {
                 if(playlists == null) {
                     console.log("Fetching playlists")
                     client.write('listplaylists\n')
-                    exports.state = 'sentListplaylists'
+                    state = 'sentListplaylists'
                 } else {
                     console.log('sending STATUS');
                     client.write('status\n');
-                    exports.state = 'sentStatus';
+                    state = 'sentStatus';
                 }
                 return;
             }
  
             client.write('idle\n');
-            exports.state = 'sentIdle';
+            state = 'sentIdle';
  
-        } else if(exports.state == 'sentListplaylists') {
+        } else if(state == 'sentListplaylists') {
             playlists = mpd.parseLists(commandBuffer);
+            SS.publish.broadcast('playlists', playlists)
+            if(playing == null)
+            {
+                client.write('playlistinfo\n');
+                state = 'sentPlaylistinfoEntire';
+            }
+            else
+            {
+                client.write('idle\n');
+                state = 'sentIdle';
+            }
+        } else if(state == 'sentPlaylistinfoEntire') {
+            var match = playlistinfoRe.exec(data);
+            if(match != null){
+                console.log("GOT current playing");
+            }
             client.write('idle\n');
-            exports.state = 'sentIdle';
-        } else if(exports.state == 'sentIdle' && data.indexOf('changed:') == 0) {
+            state = 'sentIdle';
+        } else if(state == 'sentIdle' && data.indexOf('changed:') == 0) {
             console.log('got idle status ');
             if(data.indexOf('player') != -1 || data.indexOf('playlist') != -1 || data.indexOf('mixer') != -1 || data.indexOf('options')) {
                 client.write('status\n');
-                exports.state = 'sentStatus';
+                state = 'sentStatus';
             } else {
                 client.write('idle\n');
-                exports.state = 'sentIdle';
+                state = 'sentIdle';
             }
-        } else if(exports.state == 'sentStatus' && data.indexOf('volume:') != -1) {
+        } else if(state == 'sentStatus' && data.indexOf('volume:') != -1) {
             console.log('got status');
             lastStatus = data;
             var match = statusRe.exec(lastStatus);
@@ -166,23 +183,23 @@ var conn = function() {
                         console.log('Songid changed');
                         lastSongId = newSongId;
                         client.write('playlistinfo "' + lastSongId + '"\n');
-                        exports.state = 'sentPlaylistinfo';
+                        state = 'sentPlaylistinfo';
                     }
                 } else {
                     lastSongId = newSongId;
                     client.write('playlistinfo "' + lastSongId + '"\n');
-                    exports.state = 'sentPlaylistinfo';
+                    state = 'sentPlaylistinfo';
                 }
             }
             var match = songRe.exec(lastStatus);
             if(match != null) {
                 var lastSong = match[1];
             }
-            if(exports.state != 'sentPlaylistinfo'){
+            if(state != 'sentPlaylistinfo'){
                 client.write('idle\n');
-                exports.state = 'sentIdle';
+                state = 'sentIdle';
             }
-        } else if(exports.state == 'sentPlaylistinfo'){
+        } else if(state == 'sentPlaylistinfo'){
             var match = playlistinfoRe.exec(data);
             if(match != null){
                 currentTime = match[1];
@@ -192,7 +209,7 @@ var conn = function() {
                 SS.publish.broadcast('newsong', [currentTime, currentArtist, currentTitle, currentAlbum]);
             }
             client.write('idle\n');
-            exports.state = 'sentIdle';
+            state = 'sentIdle';
         }
     });
     var onDiss = function() {
@@ -220,9 +237,9 @@ conn();
 
 var sendHighlevel = function(command) {
     if(client != null) {
-        if(exports.state == 'sentIdle') {
+        if(state == 'sentIdle') {
             client.write('noidle\n');
-            exports.state = 'sentNoIdle';
+            state = 'sentNoIdle';
             queuedCommand = command;
         }
     }
@@ -243,7 +260,7 @@ exports.actions = {
         console.log('got play ' + where + ' ' + client);
         if(client != null) {
             if(where == null) {
-                if(state == 'sentIdle') {
+                if(state != null && state != undefined && state == 'sentIdle') {
                     client.write('noidle\n');
                     state = 'sentNoIdle';
                     queuedCommand = 'play';
@@ -256,7 +273,7 @@ exports.actions = {
     next : function(cb) {
         console.log('got next');
         if(client != null) {
-            if(state == 'sentIdle') {
+            if(state != null && state != undefined && state == 'sentIdle') {
                 client.write('noidle\n');
                 state = 'sentNoIdle';
                 queuedCommand = 'next';
@@ -266,11 +283,20 @@ exports.actions = {
     prev : function(cb) {
         console.log('got prev');
         if(client != null) {
-            if(state == 'sentIdle') {
+            if(state != null && state != undefined && state == 'sentIdle') {
                 client.write('noidle\n');
                 state = 'sentNoIdle';
                 queuedCommand = 'prev';
             }
         }
+    },
+    getPlaylists : function(cb) {
+        console.log('got getPlaylists');
+        if(client != null) {
+            if(playlists != null) {
+                cb(playlists)
+            }
+        }
     }
+
 };

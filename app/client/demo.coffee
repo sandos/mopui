@@ -16,6 +16,12 @@ exports.init = ->
     $("#artist").text(message[1])
     $("#album").text(message[3])
 
+  SS.events.on 'playlists', (playlist) ->
+    $('playlists').text('<ul>')
+    playlists.forEach (playlist) ->
+      $('#playlists').append("<li>#{playlist}</li>")
+    $('playlists').append('</ul>')
+
   # Show the chat form and bind to the submit action
   # Note how we're passing the message to the server-side method as the first argument
   # If you wish to pass multiple variable use an object - e.g. {message: 'hi!', nickname: 'socket'}
