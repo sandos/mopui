@@ -5,7 +5,6 @@ var net = require('net');
 var status;
 var state = 'init';
 var queuedCommand;
-var lastStatus;
 var statusRe = /state: (.+)/;
 var randomRe = /random: (.+)/;
 var songIdRe = /songid: (.+)/;
@@ -75,12 +74,14 @@ var conn = function() {
         }
         
         mpd.logcommands(commandBuffer);
+        console.log("State " + state)
         
-        status = "Data " + data;
+        status = "Data " + data.substring(0, 30);
         SS.publish.broadcast('state', status);
         if(data.indexOf('OK MPD') == 0) {
             console.log('logged in');
             client.write('password "getoutlozer"\n');
+            return;
         }
         if(data == 'OK\n') {
             console.log('just OK');
@@ -119,6 +120,9 @@ var conn = function() {
                         state = 'sentCustomCommand';
                     }
                     return;
+                } else if(queuedCommand == 'getplaylists') {
+                    client.write('listplaylists\n');
+                    state = 'sentListplaylists';
                 }
             } else if(state == 'init') {
                 if(playlists == null) {
@@ -137,15 +141,18 @@ var conn = function() {
             state = 'sentIdle';
  
         } else if(state == 'sentListplaylists') {
+            console.log('Getting all playlists');
             playlists = mpd.parseLists(commandBuffer);
             SS.publish.broadcast('playlists', playlists)
             if(playing == null)
             {
+                console.log('getting currently playing after receiving all playlists');
                 client.write('playlistinfo\n');
                 state = 'sentPlaylistinfoEntire';
             }
             else
             {
+                console.log('NOT getting currently playing');
                 client.write('idle\n');
                 state = 'sentIdle';
             }
@@ -153,13 +160,21 @@ var conn = function() {
             var match = playlistinfoRe.exec(data);
             if(match != null){
                 console.log("GOT current playing");
+                playing = mpd.parseCurrent(commandBuffer);
+                SS.publish.broadcast('currentlyPlaying', playing);
+            } else {
+                console.log('duh');
             }
             client.write('idle\n');
             state = 'sentIdle';
         } else if(state == 'sentIdle' && data.indexOf('changed:') == 0) {
             console.log('got idle status ');
-            if(data.indexOf('player') != -1 || data.indexOf('playlist') != -1 || data.indexOf('mixer') != -1 || data.indexOf('options')) {
+            if(data.indexOf('player') != -1 || data.indexOf('mixer') != -1 || data.indexOf('options')) {
                 client.write('status\n');
+                state = 'sentStatus';
+            } else if(data.indexOf('playlist') != -1 ) {
+                console.log("Resetting currently playing");
+                playing = null;
                 state = 'sentStatus';
             } else {
                 client.write('idle\n');
@@ -167,14 +182,13 @@ var conn = function() {
             }
         } else if(state == 'sentStatus' && data.indexOf('volume:') != -1) {
             console.log('got status');
-            lastStatus = data;
-            var match = statusRe.exec(lastStatus);
+            var match = statusRe.exec(data);
             lastState = match[1];
-            var match = randomRe.exec(lastStatus);
+            var match = randomRe.exec(data);
             lastRandom = match[1];
-            var match = playlistIdRe.exec(lastStatus);
+            var match = playlistIdRe.exec(data);
             playlistId = match[1];
-            var match = songIdRe.exec(lastStatus);
+            var match = songIdRe.exec(data);
             if(match != null)
             {
                 var newSongId = match[1];
@@ -191,10 +205,11 @@ var conn = function() {
                     state = 'sentPlaylistinfo';
                 }
             }
-            var match = songRe.exec(lastStatus);
+            var match = songRe.exec(data);
             if(match != null) {
                 var lastSong = match[1];
             }
+            SS.publish.broadcast('status', [lastState, lastRandom, playlistId, lastSongId, lastSong]);
             if(state != 'sentPlaylistinfo'){
                 client.write('idle\n');
                 state = 'sentIdle';
@@ -208,8 +223,16 @@ var conn = function() {
                 currentAlbum = match[4];
                 SS.publish.broadcast('newsong', [currentTime, currentArtist, currentTitle, currentAlbum]);
             }
-            client.write('idle\n');
-            state = 'sentIdle';
+            if(playing == null) {
+                console.log("Done with current song, also fetching currently playing")
+                SS.publish.broadcast('state', "fetching currently playing");
+                client.write('playlistinfo\n');
+                state = 'sentPlaylistinfoEntire';
+            } else {
+                console.log("Done with current song, not fetching currently playing")
+                client.write('idle\n');
+                state = 'sentIdle';
+            }
         }
     });
     var onDiss = function() {
@@ -271,7 +294,7 @@ exports.actions = {
         }
     },
     next : function(cb) {
-        console.log('got next');
+        console.log('got next ' + state);
         if(client != null) {
             if(state != null && state != undefined && state == 'sentIdle') {
                 client.write('noidle\n');
@@ -294,7 +317,25 @@ exports.actions = {
         console.log('got getPlaylists');
         if(client != null) {
             if(playlists != null) {
-                cb(playlists)
+                SS.publish.broadcast('playlists', playlists)
+            } else {
+                SS.publish.broadcast('state', "fetching all playlists");
+                client.write('listplaylists\n');
+                state = 'sentListplaylists';
+            }
+        }
+    },
+    refreshState : function(cb) {
+        console.log('refreshing state');
+        if(client != null) {
+            console.log('refreshing state2');
+            if(lastState != null) {
+                console.log('refreshing state3');
+                SS.publish.broadcast('status', [lastState, lastRandom, playlistId, lastSongId, lastSong]);
+            }
+            else if (state == 'sentIdle')
+            {
+                sendHighlevel('getplaylists');
             }
         }
     }

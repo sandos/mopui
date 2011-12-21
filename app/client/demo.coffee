@@ -16,11 +16,24 @@ exports.init = ->
     $("#artist").text(message[1])
     $("#album").text(message[3])
 
-  SS.events.on 'playlists', (playlist) ->
+  SS.events.on 'playlists', (playlists) ->
     $('playlists').text('<ul>')
     playlists.forEach (playlist) ->
       $('#playlists').append("<li>#{playlist}</li>")
     $('playlists').append('</ul>')
+
+  SS.events.on 'status', (status) ->
+    if(status[1] == '1')
+      $('#rand').css({'font-weight' : 'bold'})
+    else
+      $('#rand').css({'font-weight' : 'normal'})
+      
+  SS.events.on 'currentlyPlaying', (songs) ->
+    $('playing').text('<ul>')
+    songs.forEach (song) ->
+      $('#playing').append("<li>#{song.title}</li>")
+    $('playing').append('</ul>')
+
 
   # Show the chat form and bind to the submit action
   # Note how we're passing the message to the server-side method as the first argument
