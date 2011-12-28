@@ -12,13 +12,18 @@ html(lang="en")
           button#play play/pause
           button#next next
           button#rand random
+          button#repeat repeat
+          button#consume consume
         p#message Attempting to connect to the server over websockets or Socket.IO fallback transports...
         p#status Current status
         div#song
             div#title title
             div#artist artist
             div#album album
-        div#playing PLAYING
+        div#playingInfo
+        div#playing
+      button#add Add playlist
+      button#replace Replace with playlist
       div#playlists
       script(type="text/javascript")
         $("#play").mousedown(function(e){
@@ -32,6 +37,12 @@ html(lang="en")
         })
         $("#rand").mousedown(function(e){
           SS.server.mpd.random();
+        })
+        $("#consume").mousedown(function(e){
+          SS.server.mpd.consume();
+        })
+        $("#repeat").mousedown(function(e){
+          SS.server.mpd.repeat();
         })
 
 

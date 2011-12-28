@@ -17,22 +17,35 @@ exports.init = ->
     $("#album").text(message[3])
 
   SS.events.on 'playlists', (playlists) ->
-    $('playlists').text('<ul>')
+    $('#playlists').html('<ul>')
     playlists.forEach (playlist) ->
-      $('#playlists').append("<li>#{playlist}</li>")
-    $('playlists').append('</ul>')
+      $('#playlists').append("<li class=\"track\" onclick='SS.server.mpd.addPlaylist(\"#{playlist}\")'>#{playlist}</li>")
+    $('#playlists').append('</ul>')
 
   SS.events.on 'status', (status) ->
-    if(status[1] == '1')
+    if(status.random == '1')
       $('#rand').css({'font-weight' : 'bold'})
     else
       $('#rand').css({'font-weight' : 'normal'})
-      
+    if(status.consume == '1')
+      $('#consume').css({'font-weight' : 'bold'})
+    else
+      $('#consume').css({'font-weight' : 'normal'})
+    if(status.state == 'play')
+      $('#play').css({'font-weight' : 'bold'})
+    else
+      $('#play').css({'font-weight' : 'normal'})
+    if(status.repeat == '1')
+      $('#repeat').css({'font-weight' : 'bold'})
+    else
+      $('#repeat').css({'font-weight' : 'normal'})
+    
   SS.events.on 'currentlyPlaying', (songs) ->
-    $('playing').text('<ul>')
+    $('#playingInfo').html("#{songs.length} songs in playlist")
+    $('#playing').html("<ul>")
     songs.forEach (song) ->
-      $('#playing').append("<li>#{song.title}</li>")
-    $('playing').append('</ul>')
+      $('#playing').append("<li class=\"currentitem\"><div class=\"deletetrack\" onclick='SS.server.mpd.deleteTrack(\"#{song.id}\")'>DEL&nbsp;</div><div class=\"skiptotrack\" onclick='SS.server.mpd.skipToTrack(\"#{song.id}\")'>SKIP&nbsp;</div><div class=\"currentartist\">#{song.artist}</div><div class=\"currentsong\">#{song.title}</div></li>")
+    $('#playing').append('</ul>')
 
 
   # Show the chat form and bind to the submit action

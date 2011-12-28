@@ -8,9 +8,9 @@
 body, html
   height 100%
 
+//  vertical-gradient #fff, #fff
 body
   font normal 1em sans-serif
-  vertical-gradient #eee, #fff
   text-align center
 
 p
@@ -88,8 +88,15 @@ h1
   text-align left
   list-style-type none
 #playing
+  width 100%
   float right
   clear left
+  list-style-type none
+  text-align left
+#playingInfo
+  text-align left
+  padding-bottom 10px
+  font-size large  
 #title, #artist
   width 33%
   float left
@@ -98,3 +105,13 @@ h1
   float left
   width 34%
   height 40px
+div.deletetrack
+  float left
+  cursor pointer;hand
+div.skiptotrack
+  float left
+  cursor pointer;hand
+div.currentsong
+  float right
+li.track
+  cursor pointer;hand
