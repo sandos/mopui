@@ -118,7 +118,7 @@ var conn = function() {
             client.write('password "getoutlozer"\n');
             return;
         }
-        if(data == 'OK\n') {
+        if(data == 'OK\n' && state != 'sentPlaylistinfoEntire') {
             console.log('just OK ' + state + ' ' + queuedCommand);
             if(state == 'sentNoIdle') {
                 console.log('high-level is ' + queuedCommand);
@@ -218,7 +218,8 @@ var conn = function() {
                 playing = mpd.parseCurrent(commandBuffer);
                 SS.publish.broadcast('currentlyPlaying', playing);
             } else {
-                console.log('duh');
+                playing = [];
+                SS.publish.broadcast('currentlyPlaying', playing);
             }
             handleQueue();
         } else if(state == 'sentIdle' && data.indexOf('changed:') == 0) {
