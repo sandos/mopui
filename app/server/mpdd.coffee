@@ -69,7 +69,7 @@ exports.parseCurrent = (data) ->
   while index < data.length
     String s = data[index]
     if s.beginsWith('file: ')
-      if curr.file != undefined
+      if curr.file != undefined && curr.file != null
         songs.push(curr)
       curr = {}
       curr.file = s[6..s.length-1]
@@ -88,5 +88,4 @@ exports.parseCurrent = (data) ->
     index += 1
   if curr != null && curr.file != undefined
     songs.push(curr)
-  #console.log songs
   return songs

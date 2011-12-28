@@ -44,7 +44,11 @@ exports.init = ->
     $('#playingInfo').html("#{songs.length} songs in playlist")
     $('#playing').html("<ul>")
     songs.forEach (song) ->
-      $('#playing').append("<li class=\"currentitem\"><div class=\"deletetrack\" onclick='SS.server.mpd.deleteTrack(\"#{song.id}\")'>DEL&nbsp;</div><div class=\"skiptotrack\" onclick='SS.server.mpd.skipToTrack(\"#{song.id}\")'>SKIP&nbsp;</div><div class=\"currentartist\">#{song.artist}</div><div class=\"currentsong\">#{song.title}</div></li>")
+      $('#playing').append("<li class=\"currentitem\">")
+      $('#playing').append("<div class=\"deletetrack\" onclick='SS.server.mpd.deleteTrack(\"#{song.id}\")'>DEL&nbsp;</div>")
+      $('#playing').append("<div class=\"skiptotrack\" onclick='SS.server.mpd.skipToTrack(\"#{song.id}\")'>SKIP&nbsp;</div>")
+      $('#playing').append("<div class=\"song\"><div class=\"currentartist\">#{song.artist}</div>")
+      $('#playing').append("<div class=\"currentsong\">#{song.title}</div></div></li>")
     $('#playing').append('</ul>')
 
 
