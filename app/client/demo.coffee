@@ -17,11 +17,12 @@ exports.init = ->
     $("#album").text(message[3])
 
   SS.events.on 'playlists', (playlists) ->
-    $('#playlists').html('<ul>')
+    pl = '<table>'
     playlists.forEach (playlist) ->
-      $('#playlists').append("<li class=\"track\" onclick='SS.server.mpd.addPlaylist(\"#{playlist}\")'>#{playlist}</li>")
-    $('#playlists').append('</ul>')
-
+      pl += "<tr><td class=\"track\" onclick='SS.server.mpd.addPlaylist(\"#{playlist}\")'>#{playlist}</td></tr>"
+    pl += '</table>'
+    $('#playlists').html( pl )
+  
   SS.events.on 'status', (status) ->
     if(status.random == '1')
       $('#rand').css({'font-weight' : 'bold'})
@@ -42,14 +43,14 @@ exports.init = ->
     
   SS.events.on 'currentlyPlaying', (songs) ->
     $('#playingInfo').html("#{songs.length} songs in playlist")
-    $('#playing').html("<ul>")
+    table = "<table id=\"current\"><tbody><tr><th></th><th></th><th>Artist</th><th>Song</th></tr>"
     songs.forEach (song) ->
-      $('#playing').append("<li class=\"currentitem\">")
-      $('#playing').append("<div class=\"deletetrack\" onclick='SS.server.mpd.deleteTrack(\"#{song.id}\")'>DEL&nbsp;</div>")
-      $('#playing').append("<div class=\"skiptotrack\" onclick='SS.server.mpd.skipToTrack(\"#{song.id}\")'>SKIP&nbsp;</div>")
-      $('#playing').append("<div class=\"song\"><div class=\"currentartist\">#{song.artist}</div>")
-      $('#playing').append("<div class=\"currentsong\">#{song.title}</div></div></li>")
-    $('#playing').append('</ul>')
+      table += "<tr><td class=\"deletetrack\" onclick='SS.server.mpd.deleteTrack(\"#{song.id}\")'>DEL&nbsp;</td>
+<td class=\"skiptotrack\" onclick='SS.server.mpd.skipToTrack(\"#{song.id}\")'>SKIP&nbsp;</td>
+<td class=\"currentartist\">#{song.artist}</td>
+<td class=\"currentsong\">#{song.title}</td></tr>"
+    table += '</tbody></table>'
+    $('#playing').html(table)
 
 
   # Show the chat form and bind to the submit action
